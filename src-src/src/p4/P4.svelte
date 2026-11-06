@@ -1,0 +1,201 @@
+<script>
+  import {_} from '../locales/';
+  import {fade} from 'svelte/transition';
+  import ComplexMessage from './ComplexMessage.svelte';
+  import Section from './Section.svelte';
+  import SelectProject from './SelectProject.svelte';
+  import SelectLocale from './SelectLocale.svelte';
+  import SelectTheme from './SelectTheme.svelte';
+  import Progress from './Progress.svelte';
+  import Modals from './Modals.svelte';
+  import News from './News.svelte';
+  import BatchPanel from './BatchPanel.svelte';
+  import {progress, theme, error} from './stores';
+  import {isSupported, isSafari, isStandalone, version} from './environment';
+  import {
+    APP_NAME,
+    FEEDBACK_PRIMARY,
+    FEEDBACK_SECONDARY,
+    ACCENT_COLOR,
+    SOURCE_CODE,
+    WEBSITE,
+    DONATE,
+    PRIVACY_POLICY
+  } from '../packager/brand';
+
+  let projectData;
+  let projectFiles = [];
+
+  const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+  let systemTheme = darkMedia.matches ? 'dark' : 'light';
+  if (darkMedia.addEventListener) {
+    darkMedia.addEventListener('change', () => {
+      systemTheme = darkMedia.matches ? 'dark' : 'light';
+    });
+  }
+  $: document.documentElement.setAttribute('theme', $theme === 'system' ? systemTheme : $theme);
+
+  let modalVisible = false;
+
+  const defaultTitle = document.title;
+  let title = '';
+  $: document.title = projectData && title ? `${title} - ${APP_NAME}` : defaultTitle;
+
+  const getPackagerOptionsComponent = () => import(
+    /* webpackChunkName: "packager-options-ui" */
+    './PackagerOptions.svelte'
+  ).catch((err) => {
+    $error = err;
+  });
+
+  // We know for sure we will need this component very soon, so start loading it immediately.
+  getPackagerOptionsComponent();
+</script>
+
+<style>
+  :root {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: white;
+    color: black;
+  }
+  :global([theme="dark"]) {
+    background: #111;
+    color: #eee;
+    color-scheme: dark;
+  }
+  :global(a) {
+    color: blue;
+  }
+  :global([theme="dark"] a) {
+    color: #56b2ff;
+  }
+  :global(a:active) {
+    color: red;
+  }
+  :global(input[type="text"]),
+  :global(input[type="number"]),
+  :global(textarea) {
+    padding: 2px;
+  }
+  :global(input[type="text"]),
+  :global(input[type="number"]),
+  :global(textarea),
+  :global(.is-not-safari select) {
+    background-color: white;
+    color: black;
+    border: 1px solid rgb(160, 160, 160);
+    border-radius: 2px;
+  }
+  :global(.is-not-safari select:hover) {
+    border-color: rgb(30, 30, 30);
+  }
+  :global([theme="dark"] input[type="text"]),
+  :global([theme="dark"] input[type="number"]),
+  :global([theme="dark"] textarea),
+  :global([theme="dark"] .is-not-safari select) {
+    background-color: #333;
+    color: white;
+    border-color: #888;
+  }
+  :global([theme="dark"] .is-not-safari select:hover) {
+    border-color: #bbb;
+  }
+  :global(p), :global(h1), :global(h2), :global(h3) {
+    margin: 12px 0;
+  }
+  :global(summary) {
+    cursor: pointer;
+  }
+  :global(input) {
+    font-size: 0.8em;
+  }
+  main {
+    padding-bottom: 10px;
+  }
+  footer {
+    text-align: center;
+  }
+  footer > div {
+    margin-top: 12px;
+  }
+  .disclaimer {
+    font-style: italic;
+  }
+  .version {
+    font-size: small;
+    opacity: 0.8;
+  }
+  .version a {
+    color: inherit;
+  }
+</style>
+
+<Modals bind:modalVisible={modalVisible} />
+
+<main aria-hidden={modalVisible} class:is-not-safari={!isSafari}>
+  <Section accent={ACCENT_COLOR}>
+    <div>
+      <h1>{APP_NAME}</h1>
+      {#if version}
+        <p class="version">
+          {version}
+        </p>
+      {/if}
+      <p>{$_('zx.intro1')}</p>
+      <p>{$_('zx.intro2')}</p>
+    </div>
+  </Section>
+
+  {#if !isStandalone}
+    <News />
+  {/if}
+
+  {#if isSupported}
+    <SelectProject bind:projectData bind:projectFiles />
+  {:else}
+    <Section accent="#4C97FF">
+      <h2>{$_('p4.browserNotSupported')}</h2>
+      <p>{$_('p4.browserNotSupportedDescription')}</p>
+    </Section>
+  {/if}
+
+  {#if projectFiles.length > 1}
+    {#key projectFiles}
+      <BatchPanel files={projectFiles} />
+    {/key}
+  {:else if projectData}
+    {#await getPackagerOptionsComponent()}
+      <Section center>
+        <Progress text={$_('p4.importingInterface')} />
+      </Section>
+    {:then { default: PackagerOptions }}
+      <div in:fade>
+        <PackagerOptions
+          projectData={projectData}
+          bind:title={title}
+        />
+      </div>
+    {:catch}
+      <Section center>
+        <p>
+          {$_('p4.unknownImportError')}
+        </p>
+      </Section>
+    {/await}
+  {/if}
+
+  {#if $progress.visible}
+    <Section center>
+      <Progress progress={$progress.progress} text={$progress.text} />
+    </Section>
+  {/if}
+
+  <footer>
+    <div>
+      <SelectTheme />
+    </div>
+    <div>
+      <SelectLocale />
+    </div>
+  </footer>
+</main>
